@@ -1,4 +1,5 @@
 #include <etw_kernel_trace.h>
+#include <etw_providers.h>
 #include <windows.h>
 #include <stdio.h>
 
@@ -28,33 +29,102 @@ public:
 	}
 };
 
+class MyPipeTraceListener : public ETWIPCListener {
+	void onPipeAccess(uint32_t pid, bool isServer, std::string pipename, uint64_t num) override {
+		fprintf(stdout, "NamedPipe %s pid:%lu pipe:'%s' num:%llu\n", (isServer ? "SERVER" : "CLIENT"),
+			pid, pipename.c_str(), num);
+	}
+};
+
+struct MyFileIOListener : ETWFileIOListener {
+	void onNamedPipeCreate(uint32_t pid, std::string name) override {
+		fprintf(stdout, "CreateNamedPipe pid:%lu name:%s\n", pid, name.c_str());
+	}
+};
+
 //-------------------------------------------------------------------------
 // Function for kernel trace thread.  It will call Run(), which
 // calls ProcessTrace() Windows API call.
 //-------------------------------------------------------------------------
 static DWORD WINAPI KernelTraceThreadFunc(LPVOID lpParam)
 {
-	KernelTraceSession *kernelTraceSession = (KernelTraceSession*)lpParam;
-	kernelTraceSession->Run();
+	KernelTraceSession *pTraceSession = (KernelTraceSession*)lpParam;
+	pTraceSession->Run();
+	return 0;
+}
+static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
+{
+	ETWTraceSession *pTraceSession = (ETWTraceSession*)lpParam;
+	pTraceSession->Run();
 	return 0;
 }
 
 int main(int argc, char *argv[])
 {
+	SPKernelTraceSession spKernelTrace;
+	HANDLE kernelTraceThread = 0;
 	auto pListener = std::make_shared<MyKernelTraceListener>();
-	SPKernelTraceSession spTrace = KernelTraceInstance();
-//	auto pListener = std::shared_ptr<ETWProcessListener>(pListener);
-	spTrace->SetListener(std::static_pointer_cast<ETWProcessListener>(pListener));
-	spTrace->SetListener(std::static_pointer_cast<ETWTcpListener>(pListener));
-
+	SPETWTraceSession spPipeTrace, spDnsTrace, spFileIoTrace, spVolumeTrace;
+	DWORD dwThreadIdPipes = 0;
 	DWORD dwThreadIdKernel = 0;
+	DWORD dwThreadIdDns = 0;
+	DWORD dwThreadIdFile = 0;
+	HANDLE pipeTraceThread = 0;
+	HANDLE dnsTraceThread = 0;
+	HANDLE fileioTraceThread = 0;
 
-	HANDLE kernelTraceThread = CreateThread(NULL, 0, KernelTraceThreadFunc, spTrace.get(), 0, &dwThreadIdKernel);
+	std::string errmsgs;
 
-	printf("press a key to stop\n");
-	getc(stdin);
+	auto pPipeListener = std::make_shared<MyPipeTraceListener>();
+	if (false) {
+		errmsgs.clear();
+		spKernelTrace = KernelTraceInstance();
+		spKernelTrace->SetListener(std::static_pointer_cast<ETWProcessListener>(pListener));
+		spKernelTrace->SetListener(std::static_pointer_cast<ETWTcpListener>(pListener));
 
-	spTrace->Stop();
+		kernelTraceThread = CreateThread(NULL, 0, KernelTraceThreadFunc, spKernelTrace.get(), 0, &dwThreadIdKernel);
+
+		if (!errmsgs.empty()) {
+			fputs(errmsgs.c_str(), stderr);
+		}
+	}
+	if (true) {
+		errmsgs.clear();
+		spPipeTrace = ETWIPCTraceInstance(std::static_pointer_cast<ETWIPCListener>(pPipeListener), errmsgs);
+		if (spPipeTrace) {
+			pipeTraceThread = CreateThread(NULL, 0, TraceThreadFunc, spPipeTrace.get(), 0, &dwThreadIdPipes);
+		}
+		if (!errmsgs.empty()) {
+			fputs(errmsgs.c_str(), stderr);
+		}
+	}
+	/*
+	if (false) {
+		spDnsTrace = ETWDnsTraceInstance();
+		if (spDnsTrace) {
+			dnsTraceThread = CreateThread(NULL, 0, TraceThreadFunc, spDnsTrace.get(), 0, &dwThreadIdDns);
+		}
+	}*/
+	if (false) {
+		errmsgs.clear();
+		auto pFileIOListener = std::make_shared<MyFileIOListener>();
+		spFileIoTrace = ETWFileIOTraceInstance(pFileIOListener, errmsgs);
+		if (spFileIoTrace) {
+			fileioTraceThread = CreateThread(NULL, 0, TraceThreadFunc, spFileIoTrace.get(), 0, &dwThreadIdFile);
+		}
+		if (!errmsgs.empty()) {
+			fputs(errmsgs.c_str(), stderr);
+		}
+	}
+	//printf("press a key to stop\n");
+	//getc(stdin);
+	while (true) {
+		Sleep(1000);
+	}
+
+	if (spKernelTrace) {
+		spKernelTrace->Stop();
+	}
 
 	// Give it a second...
 
@@ -62,5 +132,7 @@ int main(int argc, char *argv[])
 
 	// Finally, terminate the threads
 
-	TerminateThread(kernelTraceThread, 0);
+	if (spKernelTrace) {
+		TerminateThread(kernelTraceThread, 0);
+	}
 }

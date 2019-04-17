@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <windows.h>
 #include <winsock2.h>
+#include <Ws2tcpip.h> // IN6_ADDR
 
 //[EventType{11, 13, 14, 16, 18}, EventTypeName{"RecvIPV4", "DisconnectIPV4", "RetransmitIPV4", "ReconnectIPV4", "TCPCopyIPV4"}]
 struct TcpIp_TypeGroup1_V2
@@ -36,7 +37,6 @@ struct TcpIp_TypeGroup2_V2
 	uint32_t seqnum;
 	uint32_t connid;
 };
-#include <Ws2tcpip.h>
 
 //[EventType{ 27, 29, 30, 32, 34 }, EventTypeName{ "RecvIPV6", "DisconnectIPV6", "RetransmitIPV6", "ReconnectIPV6", "TCPCopyIPV6" }]
 struct TcpIp_TypeGroup3_V2

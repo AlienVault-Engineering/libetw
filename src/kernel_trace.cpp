@@ -112,8 +112,6 @@ void KernelTraceSessionImpl::Run() {
   }
 }
 
-// Guid associated with events such as ProcessStart/ProcessStop
-
 DEFINE_GUID(/* e611b50f-cd88-4f74-8433-4835be8ce052 */
             MyGuid,
             0xe611b50f,
@@ -308,6 +306,7 @@ void KernelTraceSessionImpl::onTcpEvent(PEVENT_RECORD pEvent) {
   // LOG(INFO) << "NetTcpEvent " << pEvent->EventHeader.EventDescriptor.Opcode;
 }
 
+
 //---------------------------------------------------------------------
 // OnRecordEvent()
 // Called from StaticEventRecordCallback(), which is called by
@@ -331,8 +330,9 @@ void KernelTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
 
   if (IsEqualGUID(pEvent->EventHeader.ProviderId, ProcessProviderGuid)) {
     onProcessEvent(pEvent);
-  } else if (IsEqualGUID(pEvent->EventHeader.ProviderId, TcpProviderGuid)) {
-    onTcpEvent(pEvent);
+  }
+  else if (IsEqualGUID(pEvent->EventHeader.ProviderId, TcpProviderGuid)) {
+	  onTcpEvent(pEvent);
   } else {
     // LOG(INFO) << "unexpected provider";
   }
@@ -389,8 +389,7 @@ static bool StartTraceSession(std::string &mySessionName,
 
   petp->MinimumBuffers = 1;
   petp->FlushTimer = 1;
-  petp->EnableFlags = EVENT_TRACE_FLAG_NETWORK_TCPIP |
-                      EVENT_TRACE_FLAG_PROCESS; // dwEnableFlags;
+  petp->EnableFlags = dwEnableFlags;
 
   petp->LogFileMode = EVENT_TRACE_REAL_TIME_MODE;
   // petp->LogFileMode |= EVENT_TRACE_SYSTEM_LOGGER_MODE; // Windows 8+
@@ -465,7 +464,8 @@ bool KernelTraceSessionImpl::Setup() {
   // This is where you wask for Process information, TCP, etc.  Look at
   // StartTraceW() docs.
 
-  DWORD kernelTraceOptions = EVENT_TRACE_FLAG_PROCESS | EVENT_TRACE_FLAG_NETWORK_TCPIP;
+  DWORD kernelTraceOptions = EVENT_TRACE_FLAG_PROCESS | EVENT_TRACE_FLAG_NETWORK_TCPIP 
+	  | EVENT_TRACE_FLAG_FILE_IO;
 
   ULONG status = StartTraceSession(
 	  actualSessionName_, kernelTraceOptions, this->m_startTraceHandle, pTraceProps_);
