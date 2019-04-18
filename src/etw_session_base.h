@@ -10,8 +10,6 @@
 
 #include "../include/etw_providers.h"
 
-#define DBG // if (0)
-
 class ETWTraceSessionBase : public ETWTraceSession
 {
 public:
@@ -172,7 +170,7 @@ protected:
 	//---------------------------------------------------------------------
 	static VOID WINAPI StaticRecordEventCallback(PEVENT_RECORD pEvent) {
 		if (nullptr == pEvent->UserContext) {
-			DBG fputs("no UserContext\n", stderr);
+			// fputs("no UserContext\n", stderr);
 			return;
 		}
 		auto pTraceSession = (ETWTraceSessionBase*)pEvent->UserContext;

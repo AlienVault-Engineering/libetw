@@ -14,6 +14,8 @@
 
 #include "etw_userdata_reader.h"
 
+#define DBG  if (0)
+
 DEFINE_GUID(/* e611b50f-cd88-4f74-8433-4835be8ce052 */
 	MyGuid,
 	0xe611b5EE, 0xcd88, 0x4f74, 0x8E, 0x33, 0x4E, 0x35, 0xce, 0x8c, 0xe0, 0x5E);
@@ -22,42 +24,7 @@ DEFINE_GUID(/* 6AD52B32-D609-4BE9-AE07-CE8DAE937E39 */
 	IPCProviderGuid,
 	0x6AD52B32,	0xD609,	0x4BE9,	0xAE, 0x07,	0xCE, 0x8D, 0xAE, 0x93,	0x7E, 0x39);
 
-
-class IPCTraceSessionImpl : public ETWTraceSessionBase {
- public:
-  /*
-   * constructor
-   */
-  IPCTraceSessionImpl() : ETWTraceSessionBase("libetw.IpcTraceSess", IPCProviderGuid, MyGuid) {
-  }
-
-  virtual void SetListener(SPETWIPCListener listener)  {
-    m_listener = listener;
-  }
-
-
-  virtual void OnRecordEvent(PEVENT_RECORD pEvent) override ;
-
- private:
-
-  SPETWIPCListener m_listener;
-};
-
-
-
-inline void ToULL(const FILETIME& ft, ULONGLONG& uft) {
-  ULARGE_INTEGER uli;
-  uli.LowPart = ft.dwLowDateTime;
-  uli.HighPart = ft.dwHighDateTime;
-  uft = uli.QuadPart;
-}
-
-inline void ToULL(const LARGE_INTEGER& uli, ULONGLONG& uft) {
-  //	ULARGE_INTEGER uli;
-  //	uli.LowPart = ft.dwLowDateTime;
-  //	uli.HighPart = ft.dwHighDateTime;
-  uft = uli.QuadPart;
-}
+// struct for EventId=5|6, OpCode=1
 
 struct RpcClientCallStart {
 	GUID iterfaceUUID;
@@ -68,6 +35,8 @@ struct RpcClientCallStart {
 };
 
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
+
+// local structures to keep track of pipe access counts
 
 struct RpcPipeEventKey {
 	uint32_t pid;
@@ -81,7 +50,7 @@ struct RpcPipeEventKey {
 		strncpy(pipe_name, name.c_str(), MIN(name.size(), sizeof(pipe_name) - 1));
 		pipe_name[sizeof(pipe_name) - 1] = 0;
 	}
-	
+
 	bool operator==(const RpcPipeEventKey &other) const
 	{
 		return (pid == other.pid
@@ -117,6 +86,34 @@ struct RpcPipeEventInfo {
 };
 
 
+class IPCTraceSessionImpl : public ETWTraceSessionBase {
+ public:
+  /*
+   * constructor
+   */
+  IPCTraceSessionImpl() : ETWTraceSessionBase("libetw.IpcTraceSess", IPCProviderGuid, MyGuid) {
+  }
+
+  virtual void SetListener(SPETWIPCListener listener)  {
+    m_listener = listener;
+  }
+
+
+  virtual void OnRecordEvent(PEVENT_RECORD pEvent) override ;
+
+ private:
+
+  void reportChangedCounts();
+
+  SPETWIPCListener m_listener;
+  uint64_t m_lastReportTime{ 0L };
+  std::unordered_map<RpcPipeEventKey, RpcPipeEventInfo> m_mapEvents;
+
+};
+
+
+
+
 static std::wstring_convert<
 	std::codecvt_utf8_utf16<wchar_t, 0x10ffff, std::little_endian>>
 	converter;
@@ -148,6 +145,25 @@ enum RPC_PROTO {
 	RPC_PROTO_LRPC=3
 };
 
+#define REPORT_INTERVAL_SEC 60
+
+void IPCTraceSessionImpl::reportChangedCounts() {
+  for (auto it = m_mapEvents.begin(); it != m_mapEvents.end(); ) {
+	  auto &info = it->second;
+	  auto diff = info.num - info.numLast;
+	  if (diff > 0) {
+		  if (m_listener) {
+			  m_listener->onPipeAccess(info.key.pid, info.key.is_server, info.key.pipe_name, diff);
+		  }
+		  info.numLast = info.num;
+		  it++;
+	  }
+	  else {
+		  m_mapEvents.erase(it++);
+	  }
+  }
+}
+
 //---------------------------------------------------------------------
 // OnRecordEvent()
 // Called from StaticEventRecordCallback(), which is called by
@@ -156,8 +172,6 @@ enum RPC_PROTO {
 void IPCTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
   DWORD status = ERROR_SUCCESS;
   HRESULT hr = S_OK;
-
-  static std::unordered_map<RpcPipeEventKey, RpcPipeEventInfo> mapEvents;
 
   if (IsEqualGUID(pEvent->EventHeader.ProviderId, IPCProviderGuid)) {
 	  auto &ed = pEvent->EventHeader.EventDescriptor;
@@ -184,31 +198,36 @@ void IPCTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
 			  std::string pipename = wstringToString(pipenameW.c_str());
 
 			  RpcPipeEventKey key(pEvent->EventHeader.ProcessId, isServerCall, pipename.c_str());
-			  auto fit = mapEvents.find(key);
-			  if (fit != mapEvents.end()) {
+			  auto fit = m_mapEvents.find(key);
+			  if (fit != m_mapEvents.end()) {
 				  fit->second.num++;
 				  // TODO: on interval, report count
+				  auto nowSec = pEvent->EventHeader.TimeStamp.QuadPart / 10000000;
+				  if ((nowSec - m_lastReportTime) > REPORT_INTERVAL_SEC) {
+					  if (m_lastReportTime != 0L) {
+						  reportChangedCounts();
+					  }
+					  m_lastReportTime = nowSec;
+				  }
+
 			  }
 			  else {
-				  mapEvents[key] = RpcPipeEventInfo(key);
+				  m_mapEvents[key] = RpcPipeEventInfo(key);
 				  if (m_listener) {
 					  m_listener->onPipeAccess(pEvent->EventHeader.ProcessId, isServerCall, pipename, 1);
+				  }
+				  if (m_lastReportTime == 0) {
+					  m_lastReportTime = pEvent->EventHeader.TimeStamp.QuadPart / 10000000;
 				  }
 			  }
 		  }
 	  }
-	  /*
-	  else if (ed.Opcode == 12 || ed.Opcode == 24 || ed.Opcode == 44 || ed.Opcode == 45) {
-		  fprintf(stderr,"got id:%d op:%d\n", ed.Id, ed.Opcode);
-	  }*/
   }
 }
 
 
 
 SPETWTraceSession ETWIPCTraceInstance(SPETWIPCListener listener, std::string &errmsgs) {
-
-  // TODO: check for existing session
 
   auto traceSession = std::make_shared<IPCTraceSessionImpl>();
   
