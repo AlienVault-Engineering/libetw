@@ -55,6 +55,16 @@ struct MyFileIOListener : ETWFileIOListener {
 	}
 };
 
+struct MyVolumeListener : public ETWVolumeListener{
+	void onVolumeMounted(uint32_t pid, std::string path) {
+		fprintf(stdout, "MOUNT pid:%lu path:%s\n", pid, path.c_str());
+
+	}
+	void onVolumeUnmounted(uint32_t pid, std::string path) {
+		fprintf(stdout, "UNmount pid:%lu path:%s\n", pid, path.c_str());
+	}
+};
+
 static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
 {
 	ETWTraceSession *pTraceSession = (ETWTraceSession*)lpParam;
@@ -96,14 +106,14 @@ int main(int argc, char *argv[])
 	auto pListener = std::make_shared<MyKernelTraceListener>();
 	std::string errmsgs;
 
-	if (false) {
+	if (true) {
 		printf("Starting 'Kernel Trace'\n");
 		auto spKernelTrace = KernelTraceInstance(std::static_pointer_cast<ETWProcessListener>(pListener),
 			std::static_pointer_cast<ETWTcpListener>(pListener), errmsgs);
 		runTraceThread(spKernelTrace);
 		printErrs(errmsgs);
 	}
-	if (true) {
+	if (false) {
 		printf("Starting 'IPC Trace'\n");
 		auto pPipeListener = std::make_shared<MyPipeTraceListener>();
 		auto spPipeTrace = ETWIPCTraceInstance(std::static_pointer_cast<ETWIPCListener>(pPipeListener), errmsgs);
@@ -115,6 +125,13 @@ int main(int argc, char *argv[])
 		auto pFileIOListener = std::make_shared<MyFileIOListener>();
 		auto spFileIoTrace = ETWFileIOTraceInstance(pFileIOListener, errmsgs);
 		runTraceThread(spFileIoTrace);
+		printErrs(errmsgs);
+	}
+	if (false) {
+		printf("Starting 'File Kernel Trace;Set 2'\n");
+		auto listener = std::make_shared<MyVolumeListener>();
+		auto spTrace = ETWVolumeTraceInstance(listener, errmsgs);
+		runTraceThread(spTrace);
 		printErrs(errmsgs);
 	}
 	printf("press a key to stop\n");

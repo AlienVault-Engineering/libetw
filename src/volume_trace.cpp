@@ -63,7 +63,7 @@ void VolumeTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
 }
 
 
-SPETWTraceSession ETWVolumeTraceInstance(SPETWVolumeListener listener, std::string errmsgs) {
+SPETWTraceSession ETWVolumeTraceInstance(SPETWVolumeListener listener, std::string &errmsgs) {
 
   // TODO: check for existing session
 
