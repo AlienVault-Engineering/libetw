@@ -90,7 +90,7 @@ public:
 
 		// quick check for empty string
 
-		if (*p == 0) {
+		if (*p == (T::value_type)0) {
 			if (dest != nullptr) {
 				*dest = T();
 			}
@@ -106,7 +106,7 @@ public:
 			currentOffset_ = datalen_;
 			return true;
 		}
-		currentOffset_ += (p - pstart + 1);
+		currentOffset_ += (p - pstart + 1)*sizeof(T::value_type);
 		if (dest != nullptr) {
 			*dest = T(pstart, p - pstart);
 		}
