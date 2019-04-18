@@ -13,12 +13,12 @@
 #include <unordered_map>
 
 #include "etw_userdata_reader.h"
+#include "utils.h"
 
 #define DBG  if (0)
 
-DEFINE_GUID(/* e611b50f-cd88-4f74-8433-4835be8ce052 */
-	MyGuid,
-	0xe611b5EE, 0xcd88, 0x4f74, 0x8E, 0x33, 0x4E, 0x35, 0xce, 0x8c, 0xe0, 0x5E);
+DEFINE_GUID(MyGuid, 0xe613b5E3, 0xcd88, 0x4f74,
+	0x8E, 0x33, 0x4E, 0x35, 0xce, 0x8c, 0xe0, 0x5E);
 
 DEFINE_GUID(/* 6AD52B32-D609-4BE9-AE07-CE8DAE937E39 */
 	IPCProviderGuid,
@@ -91,7 +91,8 @@ class IPCTraceSessionImpl : public ETWTraceSessionBase {
   /*
    * constructor
    */
-  IPCTraceSessionImpl() : ETWTraceSessionBase("libetw.IpcTraceSess", IPCProviderGuid, MyGuid) {
+  IPCTraceSessionImpl() : ETWTraceSessionBase("libetw.IpcTrace", "Microsoft-Windows-RPC", IPCProviderGuid, MyGuid) {
+	  m_doFlush = false;
   }
 
   virtual void SetListener(SPETWIPCListener listener)  {
@@ -110,33 +111,6 @@ class IPCTraceSessionImpl : public ETWTraceSessionBase {
   std::unordered_map<RpcPipeEventKey, RpcPipeEventInfo> m_mapEvents;
 
 };
-
-
-
-
-static std::wstring_convert<
-	std::codecvt_utf8_utf16<wchar_t, 0x10ffff, std::little_endian>>
-	converter;
-
-static std::wstring stringToWstring(const std::string& src) {
-	std::wstring utf16le_str;
-	try {
-		utf16le_str = converter.from_bytes(src);
-	}
-	catch (std::exception /* e */) {
-	}
-
-	return utf16le_str;
-}
-
-static std::string wstringToString(const wchar_t* src) {
-	if (src == nullptr) {
-		return std::string("");
-	}
-
-	std::string utf8_str = converter.to_bytes(src);
-	return utf8_str;
-}
 
 
 enum RPC_PROTO {
@@ -195,7 +169,7 @@ void IPCTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
 			  reader.readWString(); // network
 			  std::wstring pipenameW;
 			  reader.readWString(&pipenameW);
-			  std::string pipename = wstringToString(pipenameW.c_str());
+			  std::string pipename = etw::wstringToString(pipenameW.c_str());
 
 			  RpcPipeEventKey key(pEvent->EventHeader.ProcessId, isServerCall, pipename.c_str());
 			  auto fit = m_mapEvents.find(key);

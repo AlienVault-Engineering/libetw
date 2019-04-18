@@ -1,7 +1,8 @@
-#include <etw_kernel_trace.h>
 #include <etw_providers.h>
 #include <windows.h>
 #include <stdio.h>
+
+#include <vector>
 
 #pragma comment(lib, "Ws2_32.lib")
 
@@ -16,12 +17,24 @@ public:
 			pid, parentPid, uniqueId, usersidstr.c_str(),
 			filename.c_str(), commandLine.c_str());
 	}
+	bool isLocalhost(bool isV6, std::string addrstr) {
+		if (isV6 && addrstr == "::1") {
+			return true;
+		}
+		if (!isV6 && addrstr == "127.0.0.1") {
+			return true;
+		}
+		return false;
+	}
 	/*
 	* Notifies of IPv4 and IPv6 TCP Connect and Accept.
 	*/
 	void onTcpConnect(bool isV6, bool isAccept, uint32_t pid,
 		std::string srcaddrstr, uint16_t srcport,
 		std::string dstaddrstr, uint16_t dstport) override {
+		if (isLocalhost(isV6, srcaddrstr) && isLocalhost(isV6, dstaddrstr)) {
+			return; // ignore local traffic
+		}
 		printf("TCP %d %s pid:%lu %s_%d -> %s_%d\n", (isV6 ? 6 : 4),
 			(isAccept ? "Accept " : "Connect"), pid,
 			srcaddrstr.c_str(), srcport,
@@ -42,16 +55,6 @@ struct MyFileIOListener : ETWFileIOListener {
 	}
 };
 
-//-------------------------------------------------------------------------
-// Function for kernel trace thread.  It will call Run(), which
-// calls ProcessTrace() Windows API call.
-//-------------------------------------------------------------------------
-static DWORD WINAPI KernelTraceThreadFunc(LPVOID lpParam)
-{
-	KernelTraceSession *pTraceSession = (KernelTraceSession*)lpParam;
-	pTraceSession->Run();
-	return 0;
-}
 static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
 {
 	ETWTraceSession *pTraceSession = (ETWTraceSession*)lpParam;
@@ -59,71 +62,69 @@ static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
 	return 0;
 }
 
+void printErrs(std::string &errmsgs)
+{
+	if (errmsgs.empty()) {
+		return;
+	}
+	fputs(errmsgs.c_str(), stderr);
+	errmsgs.clear();
+}
+
+struct TraceSessionThread {
+	SPETWTraceSession session;
+	HANDLE hThread;
+	DWORD threadId;
+};
+
+static std::vector<TraceSessionThread> sessionThreads;
+
+static void runTraceThread(SPETWTraceSession spTraceSession) {
+	if (nullptr == spTraceSession) {
+		fprintf(stderr, "null trace session\n");
+		return;
+	}
+	// append new entry and link to it
+	sessionThreads.push_back(TraceSessionThread());
+	TraceSessionThread & entry = sessionThreads[sessionThreads.size() - 1];
+	entry.session = spTraceSession;
+	entry.hThread = CreateThread(NULL, 0, TraceThreadFunc, spTraceSession.get(), 0, &entry.threadId);
+}
+
 int main(int argc, char *argv[])
 {
-	SPKernelTraceSession spKernelTrace;
-	HANDLE kernelTraceThread = 0;
 	auto pListener = std::make_shared<MyKernelTraceListener>();
-	SPETWTraceSession spPipeTrace, spDnsTrace, spFileIoTrace, spVolumeTrace;
-	DWORD dwThreadIdPipes = 0;
-	DWORD dwThreadIdKernel = 0;
-	DWORD dwThreadIdDns = 0;
-	DWORD dwThreadIdFile = 0;
-	HANDLE pipeTraceThread = 0;
-	HANDLE dnsTraceThread = 0;
-	HANDLE fileioTraceThread = 0;
-
 	std::string errmsgs;
 
-	auto pPipeListener = std::make_shared<MyPipeTraceListener>();
 	if (false) {
-		errmsgs.clear();
-		spKernelTrace = KernelTraceInstance();
-		spKernelTrace->SetListener(std::static_pointer_cast<ETWProcessListener>(pListener));
-		spKernelTrace->SetListener(std::static_pointer_cast<ETWTcpListener>(pListener));
-
-		kernelTraceThread = CreateThread(NULL, 0, KernelTraceThreadFunc, spKernelTrace.get(), 0, &dwThreadIdKernel);
-
-		if (!errmsgs.empty()) {
-			fputs(errmsgs.c_str(), stderr);
-		}
+		printf("Starting 'Kernel Trace'\n");
+		auto spKernelTrace = KernelTraceInstance(std::static_pointer_cast<ETWProcessListener>(pListener),
+			std::static_pointer_cast<ETWTcpListener>(pListener), errmsgs);
+		runTraceThread(spKernelTrace);
+		printErrs(errmsgs);
 	}
 	if (true) {
-		errmsgs.clear();
-		spPipeTrace = ETWIPCTraceInstance(std::static_pointer_cast<ETWIPCListener>(pPipeListener), errmsgs);
-		if (spPipeTrace) {
-			pipeTraceThread = CreateThread(NULL, 0, TraceThreadFunc, spPipeTrace.get(), 0, &dwThreadIdPipes);
-		}
-		if (!errmsgs.empty()) {
-			fputs(errmsgs.c_str(), stderr);
-		}
+		printf("Starting 'IPC Trace'\n");
+		auto pPipeListener = std::make_shared<MyPipeTraceListener>();
+		auto spPipeTrace = ETWIPCTraceInstance(std::static_pointer_cast<ETWIPCListener>(pPipeListener), errmsgs);
+		runTraceThread(spPipeTrace);
+		printErrs(errmsgs);
 	}
-	/*
 	if (false) {
-		spDnsTrace = ETWDnsTraceInstance();
-		if (spDnsTrace) {
-			dnsTraceThread = CreateThread(NULL, 0, TraceThreadFunc, spDnsTrace.get(), 0, &dwThreadIdDns);
-		}
-	}*/
-	if (false) {
-		errmsgs.clear();
+		printf("Starting 'File Kernel Trace;Set 1'\n");
 		auto pFileIOListener = std::make_shared<MyFileIOListener>();
-		spFileIoTrace = ETWFileIOTraceInstance(pFileIOListener, errmsgs);
-		if (spFileIoTrace) {
-			fileioTraceThread = CreateThread(NULL, 0, TraceThreadFunc, spFileIoTrace.get(), 0, &dwThreadIdFile);
-		}
-		if (!errmsgs.empty()) {
-			fputs(errmsgs.c_str(), stderr);
-		}
+		auto spFileIoTrace = ETWFileIOTraceInstance(pFileIOListener, errmsgs);
+		runTraceThread(spFileIoTrace);
+		printErrs(errmsgs);
 	}
-	//printf("press a key to stop\n");
-	//getc(stdin);
-	while (true) {
-		Sleep(1000);
-	}
+	printf("press a key to stop\n");
+	getc(stdin);
+	//while (true) {
+	//	Sleep(1000);
+	//}
 
-	if (spKernelTrace) {
-		spKernelTrace->Stop();
+	for (TraceSessionThread &entry : sessionThreads) {
+		entry.session->Stop();
 	}
 
 	// Give it a second...
@@ -132,7 +133,7 @@ int main(int argc, char *argv[])
 
 	// Finally, terminate the threads
 
-	if (spKernelTrace) {
-		TerminateThread(kernelTraceThread, 0);
+	for (TraceSessionThread &entry : sessionThreads) {
+		TerminateThread(entry.hThread, 0);
 	}
 }

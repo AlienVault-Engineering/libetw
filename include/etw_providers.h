@@ -5,6 +5,11 @@
 #include <memory>
 #include <string>
 
+struct ETWSessionInfo {
+	std::string sessionName;
+	std::string providerName;
+	std::string providerGuid;
+};
 
 class ETWTraceSession
 {
@@ -21,8 +26,32 @@ public:
 	 */
 	virtual void Stop()=0;
 
+	/**
+	 * Returns information about provider and session
+	 */
+	virtual ETWSessionInfo getSessionInfo() = 0;
 };
 typedef std::shared_ptr<ETWTraceSession> SPETWTraceSession;
+
+
+struct ETWProcessListener {
+	virtual void onProcessEnd(uint64_t uniqueId, uint32_t pid, uint32_t parentPid) = 0;
+	virtual void onProcessStart(uint64_t uniqueId, uint32_t pid, uint32_t parentPid,
+		std::string usersidstr, std::string filename, const std::string &commandLine) = 0;
+};
+typedef std::shared_ptr<ETWProcessListener> SPETWProcessListener;
+
+struct ETWTcpListener {
+	/*
+	* Notifies of IPv4 and IPv6 TCP Connect and Accept.
+	*/
+	virtual void onTcpConnect(bool isV6, bool isAccept, uint32_t pid,
+		std::string srcaddrstr, uint16_t srcport,
+		std::string dstaddrstr, uint16_t dstport) = 0;
+};
+typedef std::shared_ptr<ETWTcpListener> SPETWTcpListener;
+
+SPETWTraceSession KernelTraceInstance(SPETWProcessListener procListener, SPETWTcpListener netListener, std::string &errmsgs);
 
 /*
  * IPC Trace notifies of named pipe access

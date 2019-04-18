@@ -21,14 +21,14 @@ DEFINE_GUID(MyGuid, 0xe671b573, 0xcd88, 0x4f74,
 
 DEFINE_GUID(/* D75D8303-6C21-4BDE-9C98-ECC6320F9291 */
 	FileIOProviderGuid, 0xD75D8303, 0x6C21, 0x4BDE,
-	0x7C, 0x98, 0xEC, 0xC6, 0x32, 0x0F, 0x92, 0x91);
+	0x9C, 0x98, 0xEC, 0xC6, 0x32, 0x0F, 0x92, 0x91);
 
 class FileIOTraceSessionImpl : public ETWTraceSessionBase {
  public:
   /*
    * constructor
    */
-  FileIOTraceSessionImpl() : ETWTraceSessionBase("libetw.FileIOTraceSess", FileIOProviderGuid, MyGuid) {
+	 FileIOTraceSessionImpl() : ETWTraceSessionBase("libetw.FileIOTrace1", "File Kernel Trace; Operation Set 1", FileIOProviderGuid, MyGuid) {
   }
 
   void SetListener(SPETWFileIOListener listener)  {

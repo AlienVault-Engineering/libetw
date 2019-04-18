@@ -9,12 +9,13 @@
 #include <guiddef.h>
 
 #include "../include/etw_providers.h"
+#include "utils.h"
 
 class ETWTraceSessionBase : public ETWTraceSession
 {
 public:
-	ETWTraceSessionBase(std::string sessionName, const GUID &providerGuid, const GUID &myguid) : 
-		m_actualSessionName(sessionName), m_providerGuid(providerGuid), m_myguid(myguid), m_errMsgs() { }
+	ETWTraceSessionBase(const std::string sessionName, const std::string providerName, const GUID &providerGuid, const GUID &myguid) : 
+		m_actualSessionName(sessionName), m_providerName(providerName), m_providerGuid(providerGuid), m_myguid(myguid), m_errMsgs() { }
 	~ETWTraceSessionBase() { }
 
 	virtual void Stop() override {
@@ -36,9 +37,17 @@ public:
 		ULONG status = ProcessTrace(&m_startTraceHandle, 1, 0, 0);
 
 		if (status != ERROR_SUCCESS && status != ERROR_CANCELLED) {
-			m_errMsgs += "ProcessTrace() failed with " + std::to_string(status) + "\n";
+			m_errMsgs += m_actualSessionName + ":ProcessTrace() failed with " + std::to_string(status) + "\n";
 			CloseTrace(m_startTraceHandle);
 		}
+	}
+
+	ETWSessionInfo getSessionInfo() override {
+		ETWSessionInfo info;
+		info.sessionName = m_actualSessionName;
+		info.providerName = m_providerName;
+		info.providerGuid = etw::guidToString( m_providerGuid);
+		return info;
 	}
 
 	//---------------------------------------------------------------------
@@ -48,7 +57,7 @@ public:
 	virtual bool Setup() {
 
 		ULONG status = StartTraceSession(
-			m_actualSessionName, 0, m_startTraceHandle, m_pTraceProps);
+			m_actualSessionName, m_enableFlags, m_startTraceHandle, m_pTraceProps);
 
 		if (status == false)
 			return false;
@@ -81,7 +90,7 @@ public:
 		this->m_startTraceHandle = OpenTrace(&trace);
 		if (INVALID_PROCESSTRACE_HANDLE == this->m_startTraceHandle) {
 			DWORD err = GetLastError();
-			m_errMsgs += "OpenTrace() failed with err:" + std::to_string(err) + "\n";
+			m_errMsgs += m_actualSessionName + ":OpenTrace() failed with err:" + std::to_string(err) + "\n";
 			goto cleanup;
 		}
 
@@ -99,6 +108,7 @@ protected:
 
 	bool m_stopFlag { false };
 	std::string m_actualSessionName;
+	std::string m_providerName;
 	const GUID &m_providerGuid;
 	const GUID &m_myguid;
 	TRACEHANDLE m_startTraceHandle{ 0 };
@@ -106,6 +116,7 @@ protected:
 	bool m_doFlush{ false };
 
 	uint8_t m_traceLevel = TRACE_LEVEL_INFORMATION;
+	DWORD m_enableFlags{ 0 };
 	uint64_t m_keywordMatchAny{ 0 }, m_keywordMatchAll{ 0L };
 
 	//---------------------------------------------------------------------
@@ -148,19 +159,18 @@ protected:
 			return true;
 		}
 		else if (status != ERROR_SUCCESS) {
-			m_errMsgs += "StartTrace returned " + std::to_string(status) + "\n";
+			m_errMsgs += m_actualSessionName + ":StartTrace returned " + std::to_string(status) + "\n";
 			traceSessionHandle = 0L;
 			return false;
 		}
 
 		// Enable Trace
-
 		status = EnableTraceEx2(traceSessionHandle, &m_providerGuid,
 				EVENT_CONTROL_CODE_ENABLE_PROVIDER,
 				m_traceLevel, m_keywordMatchAny, m_keywordMatchAll, 0, NULL);
-
+	
 		if (status != ERROR_SUCCESS) {
-			m_errMsgs += "EnableTraceEx2 failed with status " + std::to_string(status) + "\n";
+			m_errMsgs += m_actualSessionName + ":EnableTraceEx2 failed with status " + std::to_string(status) + "\n";
 		}
 		return true;
 	}
