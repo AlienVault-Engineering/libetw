@@ -136,19 +136,48 @@ static inline void ipaddrstr(uint32_t addr, std::string& dest) {
   dest = tmp;
 }
 
+static const uint32_t gIPv4LocalAddr = 0x0100007F;
+static const in_addr6 gIPv6LocalAddr = {0,0,0,0, 0,0,0,0, 0,0,0,0 ,0,0,0,1};
+
+#define EVENT_IPV6_DISCONNECT (EVENT_TRACE_TYPE_DISCONNECT+16)
+#define EVENT_IPV6_RECONNECT (EVENT_TRACE_TYPE_RECONNECT+16)
+#define EVENT_IPV6_CONNECT (EVENT_TRACE_TYPE_CONNECT+16)
+#define EVENT_IPV6_ACCEPT (EVENT_TRACE_TYPE_ACCEPT+16)
+
+inline bool ShouldSkipLocal(uint32_t flags, uint32_t srcaddr, uint32_t destaddr) {
+
+	return (flags && ETWFlagTcpIgnoreLocal) &&
+		(destaddr == srcaddr || destaddr == gIPv4LocalAddr);
+}
+
+inline bool ShouldSkipLocal(uint32_t flags, in6_addr srcaddr, in6_addr destaddr) {
+
+	return (flags && ETWFlagTcpIgnoreLocal) &&
+		(memcmp(&destaddr, &srcaddr, sizeof(in6_addr)) == 0
+			|| memcmp(&destaddr, &gIPv6LocalAddr, sizeof(in6_addr)) == 0);
+}
+
 void KernelTraceSessionImpl::onTcpEvent(PEVENT_RECORD pEvent) {
+  auto &ed = pEvent->EventHeader.EventDescriptor;
+
   // currently only support V2 struct defs
-  if (pEvent->EventHeader.EventDescriptor.Version != 2) {
+  if (ed.Version != 2) {
     return;
   }
-  switch (pEvent->EventHeader.EventDescriptor.Opcode) {
+
+  std::string dstaddrstr;
+  std::string srcaddrstr;
+
+  switch (ed.Opcode) {
   case EVENT_TRACE_TYPE_ACCEPT:
   case EVENT_TRACE_TYPE_CONNECT: {
-    bool isAccept = (pEvent->EventHeader.EventDescriptor.Opcode ==
-                     (EVENT_TRACE_TYPE_ACCEPT));
+    bool isAccept = (ed.Opcode == EVENT_TRACE_TYPE_ACCEPT);
     auto pData = (TcpIp_TypeGroup2_V2*)pEvent->UserData;
-    std::string dstaddrstr;
-    std::string srcaddrstr;
+
+	if (ShouldSkipLocal(m_runtimeFlags, pData->saddr, pData->daddr)) {
+		return;
+	}
+
     ipaddrstr(pData->daddr, dstaddrstr);
     ipaddrstr(pData->saddr, srcaddrstr);
 	if (tcpListener_) {
@@ -158,14 +187,16 @@ void KernelTraceSessionImpl::onTcpEvent(PEVENT_RECORD pEvent) {
 	}
     break;
   }
-  case EVENT_TRACE_TYPE_ACCEPT + 16:
-  case EVENT_TRACE_TYPE_CONNECT + 16: {
-    bool isAccept = (pEvent->EventHeader.EventDescriptor.Opcode ==
-                     (EVENT_TRACE_TYPE_ACCEPT + 16));
+  case EVENT_IPV6_ACCEPT :
+  case EVENT_IPV6_CONNECT: {
+    bool isAccept = (ed.Opcode == EVENT_IPV6_ACCEPT);
     auto pData = (TcpIp_TypeGroup4_V2*)pEvent->UserData;
-    std::string dstaddrstr;
-    std::string srcaddrstr;
-    ipaddrstr(pData->daddr, dstaddrstr);
+
+	if (ShouldSkipLocal(m_runtimeFlags, pData->saddr, pData->daddr)) {
+		return;
+	}
+
+	ipaddrstr(pData->daddr, dstaddrstr);
     ipaddrstr(pData->saddr, srcaddrstr);
 
     if (tcpListener_) {
@@ -175,16 +206,42 @@ void KernelTraceSessionImpl::onTcpEvent(PEVENT_RECORD pEvent) {
     }
     break;
   }
-  case EVENT_TRACE_TYPE_DISCONNECT:
   case EVENT_TRACE_TYPE_RECONNECT: {
     auto pData = (TcpIp_TypeGroup1_V2*)pEvent->UserData;
-    break;
+
+	if (ShouldSkipLocal(m_runtimeFlags, pData->saddr, pData->daddr)) {
+		return;
+	}
+
+	ipaddrstr(pData->daddr, dstaddrstr);
+	ipaddrstr(pData->saddr, srcaddrstr);
+
+	if (tcpListener_) {
+		tcpListener_->onTcpReconnect(false, pData->PID,
+			srcaddrstr, ntohs(pData->sport),
+			dstaddrstr, ntohs(pData->dport));
+	}
+	break;
   }
-  case EVENT_TRACE_TYPE_DISCONNECT + 16:
-  case EVENT_TRACE_TYPE_RECONNECT + 16: {
+  case EVENT_IPV6_RECONNECT: {
     auto pData = (TcpIp_TypeGroup3_V2*)pEvent->UserData;
-    break;
+
+	if (ShouldSkipLocal(m_runtimeFlags, pData->saddr, pData->daddr)) {
+		return;
+	}
+
+	ipaddrstr(pData->daddr, dstaddrstr);
+	ipaddrstr(pData->saddr, srcaddrstr);
+
+	if (tcpListener_) {
+		tcpListener_->onTcpReconnect(true, pData->PID,
+			srcaddrstr, ntohs(pData->sport),
+			dstaddrstr, ntohs(pData->dport));
+	}
+
+	break;
   }
+  // WARNING: these are very frequent:
   // case EVENT_TRACE_TYPE_RECEIVE:
   // case EVENT_TRACE_TYPE_SEND:
   default:

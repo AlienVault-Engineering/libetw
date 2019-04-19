@@ -50,6 +50,10 @@ public:
 		return info;
 	}
 
+	void setFlags(uint32_t flags) override { m_runtimeFlags = flags; }
+
+	uint32_t getFlags() { return m_runtimeFlags; }
+
 	//---------------------------------------------------------------------
 	// Establish a session.
 	// Returns true on success, false otherwise.
@@ -114,6 +118,7 @@ protected:
 	TRACEHANDLE m_startTraceHandle{ 0 };
 	PEVENT_TRACE_PROPERTIES m_pTraceProps{ 0 };
 	bool m_doFlush{ false };
+	uint32_t m_runtimeFlags{ 0 };
 
 	uint8_t m_traceLevel = TRACE_LEVEL_INFORMATION;
 	DWORD m_enableFlags{ 0 };
@@ -184,6 +189,9 @@ protected:
 			return;
 		}
 		auto pTraceSession = (ETWTraceSessionBase*)pEvent->UserContext;
+		if (pTraceSession->getFlags() & ETWFlagDropAllEvents) {
+			return;
+		}
 		return pTraceSession->OnRecordEvent(pEvent);
 	}
 

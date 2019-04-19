@@ -12,6 +12,19 @@ struct ETWSessionInfo {
 	std::string providerGuid;
 };
 
+/*
+ * Runtime flags
+ * NOTE: provider defined flags should begin at bit 8.
+ *
+ * If session is running, setting ETWFlagDropAllEvents
+ * will instruct provider to drop all events.  This is
+ * useful for pausing all processing if application
+ * determines system load is high.
+ */
+#define ETWFlagDropAllEvents (1<<0)
+
+#define ETWFlagTcpIgnoreLocal (1<<8)
+
 class ETWTraceSession
 {
 public:
@@ -31,6 +44,14 @@ public:
 	 * Returns information about provider and session
 	 */
 	virtual ETWSessionInfo getSessionInfo() = 0;
+
+	/**
+	  * Application can use flags defined above, or for each
+	  * provider to alter runtime behavior.
+	  */
+	virtual void setFlags(uint32_t flags) = 0;
+
+	virtual uint32_t getFlags() = 0;
 };
 typedef std::shared_ptr<ETWTraceSession> SPETWTraceSession;
 
@@ -47,6 +68,19 @@ struct ETWTcpListener {
 	* Notifies of IPv4 and IPv6 TCP Connect and Accept.
 	*/
 	virtual void onTcpConnect(bool isV6, bool isAccept, uint32_t pid,
+		std::string srcaddrstr, uint16_t srcport,
+		std::string dstaddrstr, uint16_t dstport) = 0;
+
+	/*
+	* Notifies of IPv4 and IPv6 TCP Reconnect.
+	* Such as connection failures.
+	* Examples:
+	* - ssh to system that does not have port 22 open or
+	* service is down.
+	* - browse to url of host that is not serving http(s) on that port.
+	* - tcp port scan.
+	*/
+	virtual void onTcpReconnect(bool isV6, uint32_t pid,
 		std::string srcaddrstr, uint16_t srcport,
 		std::string dstaddrstr, uint16_t dstport) = 0;
 };
