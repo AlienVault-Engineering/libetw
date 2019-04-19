@@ -18,9 +18,8 @@
 
 #define DBG if (0)
 
-DEFINE_GUID(/* e611b50f-cd88-4f74-8433-4835be8ce052 */
-	MyGuid, 0xe611b5EE, 0xcd88,0x4f74,
-	0x8E, 0x33, 0x4E, 0x35, 0xce, 0x8c, 0xe0, 0x5E);
+DEFINE_GUID(MyGuid, 0x6611b5EE, 0xcd88,0x4f74,
+	0x8E, 0x43, 0x4E, 0x35, 0xdd, 0x3c, 0xe0, 0x32);
 
 DEFINE_GUID(/* 058DD951-7604-414D-A5D6-A56D35367A46 */
 	FileIO2ProviderGuid, 0x058DD951, 0x7604, 0x414D,
@@ -31,7 +30,7 @@ class VolumeTraceSessionImpl : public ETWTraceSessionBase {
   /*
    * constructor
    */
-  VolumeTraceSessionImpl() : ETWTraceSessionBase("libetw.FileIO2","File Kernel Trace; Operation Set 2", FileIO2ProviderGuid, MyGuid) {
+  VolumeTraceSessionImpl() : ETWTraceSessionBase("libetw.FileIO.2","File Kernel Ops Set 2", FileIO2ProviderGuid, MyGuid) {
   }
 
   virtual void SetListener(SPETWVolumeListener listener)  {
@@ -65,12 +64,10 @@ void VolumeTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
 
 SPETWTraceSession ETWVolumeTraceInstance(SPETWVolumeListener listener, std::string &errmsgs) {
 
-  // TODO: check for existing session
-
   auto spTraceSession = std::make_shared<VolumeTraceSessionImpl>();
   
   if (nullptr == spTraceSession || spTraceSession->Setup() == false) {
-    //LOG(ERROR) << "KernelTraceSession Setup failed";
+    errmsgs = "File IO 2 TraceSession Setup failed\n";
 	return nullptr;
   }
   spTraceSession->SetListener(listener);

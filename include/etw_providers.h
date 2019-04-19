@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 struct ETWSessionInfo {
 	std::string sessionName;
@@ -83,4 +84,14 @@ struct ETWFileIOListener {
 typedef std::shared_ptr<ETWFileIOListener> SPETWFileIOListener;
 
 SPETWTraceSession ETWFileIOTraceInstance(SPETWFileIOListener listener, std::string &errmsgs);
+
+/*
+ * Windows-DNS-Client events
+ */
+struct ETWDNSListener {
+	virtual void onDnsAddress(std::string hostname, std::vector<std::string> &addrs) = 0;
+};
+typedef std::shared_ptr<ETWDNSListener> SPETWDNSListener;
+
+SPETWTraceSession ETWDnsTraceInstance(SPETWDNSListener listener, std::string &errmsgs);
 

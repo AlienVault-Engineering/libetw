@@ -1,9 +1,13 @@
 # libetw
 Simple C++ library for Windows ETW event access
 
+## Features
+ - Kernel Processes and Tcp Events
+ - Dns Addresses
+
 ## Work in progress
 
-The process and tcp events from the kernel provider are working, but the rest are work in progress.
+The IPC, FileIO Volume are a work in progress.
 
 ## Build With Tests
 ```

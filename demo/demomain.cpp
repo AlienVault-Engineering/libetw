@@ -65,6 +65,16 @@ struct MyVolumeListener : public ETWVolumeListener{
 	}
 };
 
+struct MyDNSListener : public ETWDNSListener {
+	void onDnsAddress(std::string hostname, std::vector<std::string> &addrs) override {
+		std::string s;
+		for (std::string addr : addrs) {
+			s += addr + ",";
+		}
+		fprintf(stdout, "DNS '%s' => %s\n", hostname.c_str(), s.c_str());
+	}
+};
+
 static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
 {
 	ETWTraceSession *pTraceSession = (ETWTraceSession*)lpParam;
@@ -118,6 +128,13 @@ int main(int argc, char *argv[])
 		auto pPipeListener = std::make_shared<MyPipeTraceListener>();
 		auto spPipeTrace = ETWIPCTraceInstance(std::static_pointer_cast<ETWIPCListener>(pPipeListener), errmsgs);
 		runTraceThread(spPipeTrace);
+		printErrs(errmsgs);
+	}
+	if (false) {
+		printf("Starting 'DNS Client Trace'\n");
+		auto listener = std::make_shared<MyDNSListener>();
+		auto spTrace = ETWDnsTraceInstance(listener, errmsgs);
+		runTraceThread(spTrace);
 		printErrs(errmsgs);
 	}
 	if (false) {
