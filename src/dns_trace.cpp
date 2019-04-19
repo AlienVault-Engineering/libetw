@@ -92,7 +92,8 @@ void DnsTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
   DWORD status = ERROR_SUCCESS;
   HRESULT hr = S_OK;
 
-  if (IsEqualGUID(pEvent->EventHeader.ProviderId, DnsProviderGuid)) {
+  if (true) { //IsEqualGUID(pEvent->EventHeader.ProviderId, DnsProviderGuid)) {
+
 	  auto &ed = pEvent->EventHeader.EventDescriptor;
 	  if (ed.Version == 0 && ed.Id == 3008) { // and 3020 , cache in 3018
 		  m_queryCount++;
