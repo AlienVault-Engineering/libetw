@@ -61,13 +61,14 @@ struct Empty { };
 // parse answer to extract ip addresses
 //---------------------------------------------------------------------
 bool DnsExtractAddressesFromAnswer(const std::string answer, std::vector<std::string> &dest) {
-	std::vector<std::string> parts;
-	size_t pos = -1;
-	while ((pos+1) < answer.length()) {
+	int pos = -1;
+	while ((pos+2) < answer.length()) {
 		auto start = pos+1;
-		pos = answer.find(';',start);
+		size_t end = (int)answer.find(';',start);
 
-		if (pos == std::string::npos || (pos - start) < 3) { break; }
+		if (end == std::string::npos || (end - start) < 3) { break; }
+
+		pos = (int)end;
 
 		// skip entries like 'type:   5 some.cname.com'
 		if (answer[start] == 't') {
