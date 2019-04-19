@@ -3,6 +3,8 @@
  * Source:
  https://docs.microsoft.com/en-us/windows/desktop/ETW/using-tdhgetproperty-to-consume-event-data
  */
+#if defined(RELDBG) || defined(DEBUG_)
+
 //Turns the DEFINE_GUID for EventTraceGuid into a const.
 #define INITGUID
 
@@ -42,14 +44,13 @@ TRACEHANDLE g_hTrace = 0;
 
 // Prototypes
 
-void WINAPI ProcessEvent(PEVENT_RECORD pEvent);
-DWORD GetEventInformation(PEVENT_RECORD pEvent, PTRACE_EVENT_INFO & pInfo);
-DWORD PrintProperties(PEVENT_RECORD pEvent, PTRACE_EVENT_INFO pInfo, USHORT i, LPWSTR pStructureName, USHORT StructIndex);
-DWORD FormatAndPrintData(PEVENT_RECORD pEvent, USHORT InType, USHORT OutType, PBYTE pData, DWORD DataSize, PEVENT_MAP_INFO pMapInfo);
-void PrintMapString(PEVENT_MAP_INFO pMapInfo, PBYTE pData);
-DWORD GetArraySize(PEVENT_RECORD pEvent, PTRACE_EVENT_INFO pInfo, USHORT i, PUSHORT ArraySize);
-DWORD GetMapInfo(PEVENT_RECORD pEvent, LPWSTR pMapName, DWORD DecodingSource, PEVENT_MAP_INFO & pMapInfo);
-void RemoveTrailingSpace(PEVENT_MAP_INFO pMapInfo);
+static DWORD GetEventInformation(PEVENT_RECORD pEvent, PTRACE_EVENT_INFO & pInfo);
+static DWORD PrintProperties(PEVENT_RECORD pEvent, PTRACE_EVENT_INFO pInfo, USHORT i, LPWSTR pStructureName, USHORT StructIndex);
+static DWORD FormatAndPrintData(PEVENT_RECORD pEvent, USHORT InType, USHORT OutType, PBYTE pData, DWORD DataSize, PEVENT_MAP_INFO pMapInfo);
+static void PrintMapString(PEVENT_MAP_INFO pMapInfo, PBYTE pData);
+static DWORD GetArraySize(PEVENT_RECORD pEvent, PTRACE_EVENT_INFO pInfo, USHORT i, PUSHORT ArraySize);
+static DWORD GetMapInfo(PEVENT_RECORD pEvent, LPWSTR pMapName, DWORD DecodingSource, PEVENT_MAP_INFO & pMapInfo);
+static void RemoveTrailingSpace(PEVENT_MAP_INFO pMapInfo);
 
 typedef LPTSTR(NTAPI *PIPV6ADDRTOSTRING)(
 	const IN6_ADDR *Addr,
@@ -60,7 +61,8 @@ typedef LPTSTR(NTAPI *PIPV6ADDRTOSTRING)(
 
 
 
-// Callback that receives the events. 
+// Can be called from ETW handlers during development to
+// dump info on event UserData fields
 void PrintEventInfo(PEVENT_RECORD &pEvent)
 {
 	DWORD status = ERROR_SUCCESS;
@@ -935,3 +937,4 @@ cleanup:
 
 	return status;
 }
+#endif // ifndef NDEBUG

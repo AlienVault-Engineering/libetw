@@ -57,15 +57,28 @@ static void split(const std::string& s, char seperator, std::vector<std::string>
 struct Empty { };
 #include "etw_userdata_reader.h"
 
-static bool getAddresses(const std::string answer, std::vector<std::string> &dest) {
+//---------------------------------------------------------------------
+// parse answer to extract ip addresses
+//---------------------------------------------------------------------
+bool DnsExtractAddressesFromAnswer(const std::string answer, std::vector<std::string> &dest) {
 	std::vector<std::string> parts;
-	split(answer, ';', parts);
-	for (std::string &s : parts) {
-		auto pos = s.find("::ffff:");
-		if (pos != std::string::npos) {
-			std::string addr = s.substr(pos + 7);
-			dest.push_back(addr);
+	size_t pos = -1;
+	while ((pos+1) < answer.length()) {
+		auto start = pos+1;
+		pos = answer.find(';',start);
+
+		if (pos == std::string::npos || (pos - start) < 3) { break; }
+
+		// skip entries like 'type:   5 some.cname.com'
+		if (answer[start] == 't') {
+			continue;
 		}
+		std::string addr = answer.substr(start, (pos - start));
+		if (addr.find("::ffff:") != std::string::npos) {
+			// ipv4
+			addr = addr.substr(7);
+		}
+		dest.push_back(addr);
 	}
 }
 
@@ -106,7 +119,7 @@ void DnsTraceSessionImpl::OnRecordEvent(PEVENT_RECORD pEvent) {
 		  //printf("queryName:%s  answer:%s\n", queryName.c_str(), answer.c_str());
 		  //PrintEventInfo(pEvent);
 		  std::vector<std::string> addresses;
-		  getAddresses(answer, addresses);
+		  DnsExtractAddressesFromAnswer(answer, addresses);
 		  
 		  if (!addresses.empty() && m_listener) {
 			  m_listener->onDnsAddress(queryName, addresses);
