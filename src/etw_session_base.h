@@ -138,7 +138,7 @@ protected:
 
 		memset(petp, 0, sizeof(EVENT_TRACE_PROPERTIES));
 
-		petp->Wnode.BufferSize = bufferSize;
+		petp->Wnode.BufferSize = (ULONG)bufferSize;
 		petp->LogFileNameOffset = 0;
 		petp->LoggerNameOffset = sizeof(EVENT_TRACE_PROPERTIES);
 

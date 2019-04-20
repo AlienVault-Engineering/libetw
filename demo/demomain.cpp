@@ -17,29 +17,27 @@ public:
 			pid, parentPid, uniqueId, usersidstr.c_str(),
 			filename.c_str(), commandLine.c_str());
 	}
-	bool isLocalhost(bool isV6, std::string addrstr) {
-		if (isV6 && addrstr == "::1") {
-			return true;
-		}
-		if (!isV6 && addrstr == "127.0.0.1") {
-			return true;
-		}
-		return false;
-	}
+
 	/*
 	* Notifies of IPv4 and IPv6 TCP Connect and Accept.
 	*/
 	void onTcpConnect(bool isV6, bool isAccept, uint32_t pid,
 		std::string srcaddrstr, uint16_t srcport,
 		std::string dstaddrstr, uint16_t dstport) override {
-		if (isLocalhost(isV6, srcaddrstr) && isLocalhost(isV6, dstaddrstr)) {
-			return; // ignore local traffic
-		}
 		printf("TCP %d %s pid:%lu %s_%d -> %s_%d\n", (isV6 ? 6 : 4),
-			(isAccept ? "Accept " : "Connect"), pid,
+			(isAccept ? "Accept" : "Connect"), pid,
 			srcaddrstr.c_str(), srcport,
 			dstaddrstr.c_str(), dstport);
 	}
+	void onTcpReconnect(bool isV6, uint32_t pid,
+		std::string srcaddrstr, uint16_t srcport,
+		std::string dstaddrstr, uint16_t dstport) override {
+		printf("TCP %d %s pid:%lu %s_%d -> %s_%d\n", (isV6 ? 6 : 4),
+			"RECONNECT", pid,
+			srcaddrstr.c_str(), srcport,
+			dstaddrstr.c_str(), dstport);
+	}
+
 };
 
 class MyPipeTraceListener : public ETWIPCListener {
@@ -74,6 +72,13 @@ struct MyDNSListener : public ETWDNSListener {
 		fprintf(stdout, "DNS '%s' => %s\n", hostname.c_str(), s.c_str());
 	}
 };
+
+struct MyUsbHubListener : public ETWUSBHubListener {
+	void onUSBPlugged(std::string devtype, std::string vendorid, std::string deviceid) override {
+		fprintf(stdout, "USB Plugged vendorid:%s deviceid:%s type:%s\n", vendorid.c_str(), deviceid.c_str(), devtype.c_str());
+	}
+};
+
 
 static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
 {
@@ -120,6 +125,9 @@ int main(int argc, char *argv[])
 		printf("Starting 'Kernel Trace'\n");
 		auto spKernelTrace = KernelTraceInstance(std::static_pointer_cast<ETWProcessListener>(pListener),
 			std::static_pointer_cast<ETWTcpListener>(pListener), errmsgs);
+
+		spKernelTrace->setFlags(ETWFlagTcpIgnoreLocal);
+
 		runTraceThread(spKernelTrace);
 		printErrs(errmsgs);
 	}
@@ -138,6 +146,13 @@ int main(int argc, char *argv[])
 		printErrs(errmsgs);
 	}
 	if (false) {
+		printf("Starting 'USB Hub Trace'\n");
+		auto spTrace = ETWUSBHubTraceInstance(std::make_shared<MyUsbHubListener>(), errmsgs);
+		runTraceThread(spTrace);
+		printErrs(errmsgs);
+	}
+	/*
+	if (false) {
 		printf("Starting 'File Kernel Trace;Set 1'\n");
 		auto pFileIOListener = std::make_shared<MyFileIOListener>();
 		auto spFileIoTrace = ETWFileIOTraceInstance(pFileIOListener, errmsgs);
@@ -150,7 +165,8 @@ int main(int argc, char *argv[])
 		auto spTrace = ETWVolumeTraceInstance(listener, errmsgs);
 		runTraceThread(spTrace);
 		printErrs(errmsgs);
-	}
+	}*/
+
 	printf("press a key to stop\n");
 	getc(stdin);
 	//while (true) {

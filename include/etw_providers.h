@@ -129,3 +129,12 @@ typedef std::shared_ptr<ETWDNSListener> SPETWDNSListener;
 
 SPETWTraceSession ETWDnsTraceInstance(SPETWDNSListener listener, std::string &errmsgs);
 
+/*
+ * Microsoft-Windows-USB-USBHUB3 (PnP)
+ */
+struct ETWUSBHubListener {
+	virtual void onUSBPlugged(std::string devtype, std::string vendorid, std::string deviceid) = 0;
+};
+typedef std::shared_ptr<ETWUSBHubListener> SPETWUSBHubListener;
+
+SPETWTraceSession ETWUSBHubTraceInstance(SPETWUSBHubListener listener, std::string &errs);
