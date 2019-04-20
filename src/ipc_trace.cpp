@@ -127,7 +127,7 @@ void IPCTraceSessionImpl::reportChangedCounts() {
 	  auto diff = info.num - info.numLast;
 	  if (diff > 0) {
 		  if (m_listener) {
-			  m_listener->onPipeAccess(info.key.pid, info.key.is_server, info.key.pipe_name, diff);
+			  m_listener->onPipeAccess(info.key.pid, info.key.is_server != 0, info.key.pipe_name, diff);
 		  }
 		  info.numLast = info.num;
 		  it++;

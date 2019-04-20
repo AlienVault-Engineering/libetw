@@ -44,6 +44,7 @@ struct Empty { };
 
 //---------------------------------------------------------------------
 // parse answer to extract ip addresses
+// return true on error, false on success
 //---------------------------------------------------------------------
 bool DnsExtractAddressesFromAnswer(const std::string answer, std::vector<std::string> &dest) {
 	int pos = -1;
@@ -66,6 +67,7 @@ bool DnsExtractAddressesFromAnswer(const std::string answer, std::vector<std::st
 		}
 		dest.push_back(addr);
 	}
+	return dest.empty();
 }
 
 //---------------------------------------------------------------------

@@ -8,7 +8,7 @@
 #include <evntrace.h>
 #include <guiddef.h>
 
-#include "../include/etw_providers.h"
+#include <etw/etw_providers.h>
 #include "utils.h"
 
 class ETWTraceSessionBase : public ETWTraceSession

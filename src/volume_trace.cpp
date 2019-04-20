@@ -1,5 +1,5 @@
 
-#include "etw_providers.h"
+#include <etw/etw_providers.h>
 
 // Turns the DEFINE_GUID for EventTraceGuid into a const.
 #define INITGUID
