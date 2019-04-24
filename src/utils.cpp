@@ -5,6 +5,42 @@
 
 namespace etw {
 
+bool ExtractCmdlinePath(const std::string &cmdline, std::string &path) {
+	if (cmdline.length() < 3) { return false; }
+
+	// quoted path
+
+	if (cmdline[0] == '"') {
+		auto pos = cmdline.find('"', 1);
+		if (pos == std::string::npos) { return true; }
+		path = cmdline.substr(1, pos - 1);
+		return false;
+	}
+
+	size_t start = 0;
+	auto pos = cmdline.find(' ');
+
+	if (pos == std::string::npos) { return true; }
+
+	if (cmdline.length() > 5 && cmdline[0] == '\\' && cmdline[1] == '?') {
+		start = 4;
+	}
+
+	// not quoted, but could have spaces
+	auto last_pathsep_pos = cmdline.rfind('\\');
+	if (last_pathsep_pos != std::string::npos) {
+		auto last_space_pos = cmdline.find(' ',last_pathsep_pos);
+		if (last_space_pos != std::string::npos) {
+			pos = last_space_pos;
+		}
+	}
+
+	path = cmdline.substr(start, pos - start);
+
+	return false;
+}
+
+
 std::string guidToString(GUID guid) {
   char tmp[64];
   snprintf(tmp,sizeof(tmp),"%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX", 

@@ -6,7 +6,7 @@
 #define DBG if (0)
 
 DEFINE_GUID(
-	MyGuid, 0xe611b544, 0xcd83, 0x4f74,
+	MyDnsGuid, 0xe611b544, 0xcd83, 0x4f74,
 	0x84, 0x33, 0x44, 0x35, 0xc4, 0x8c, 0xe0, 0x11);
 
 DEFINE_GUID(/* 1C95126E-7EEA-49A9-A3FE-A378B03DDB4D */
@@ -19,7 +19,7 @@ class DnsTraceSessionImpl : public ETWTraceSessionBase {
   /*
    * constructor
    */
-  DnsTraceSessionImpl() : ETWTraceSessionBase("libetw.DnsTraceSess", "Microsoft-Windows-DNS-Client", DnsProviderGuid, MyGuid) {
+  DnsTraceSessionImpl() : ETWTraceSessionBase("libetw.DnsTraceSess", "Microsoft-Windows-DNS-Client", DnsProviderGuid, MyDnsGuid) {
   }
 
   virtual void SetListener(SPETWDNSListener listener)  {

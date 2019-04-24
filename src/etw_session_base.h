@@ -31,6 +31,7 @@ public:
 	//---------------------------------------------------------------------
 	virtual void Run() override {
 		m_stopFlag = false;
+		m_errMsgs.clear();
 
 		// Process Trace - blocks until BufferCallback returns FALSE, or
 
@@ -53,6 +54,8 @@ public:
 	void setFlags(uint32_t flags) override { m_runtimeFlags = flags; }
 
 	uint32_t getFlags() { return m_runtimeFlags; }
+
+	std::string getErrors() override { return m_errMsgs; }
 
 	//---------------------------------------------------------------------
 	// Establish a session.

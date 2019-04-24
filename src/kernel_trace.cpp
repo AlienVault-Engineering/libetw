@@ -21,8 +21,7 @@
 //#include "osquery/core/windows/wmi.h" // wstringToString
 #include "utils.h"
 
-DEFINE_GUID(/* e611b50f-cd88-4f74-8433-4835be8ce052 */
-	MyGuid, 0xe611b50f, 0xcd88, 0x4f74,
+DEFINE_GUID(MyKernelGuid, 0xe611b50f, 0xcd88, 0x4f74,
 	0x84, 0x33, 0x48, 0x35, 0xce, 0x8c, 0xe0, 0x52);
 
 DEFINE_GUID(/* 3d6fa8d0-fe05-11d0-9dda-00c04fd7ba7c */
@@ -53,7 +52,7 @@ class KernelTraceSessionImpl : public ETWTraceSessionBase {
   /*
    * constructor
    */
-  KernelTraceSessionImpl() : ETWTraceSessionBase(KERNEL_LOGGER_NAME /*"libetw.Kernel"*/, KERNEL_LOGGER_NAME ,SystemTraceControlGuid, MyGuid) {
+  KernelTraceSessionImpl() : ETWTraceSessionBase(KERNEL_LOGGER_NAME /*"libetw.Kernel"*/, KERNEL_LOGGER_NAME ,SystemTraceControlGuid, MyKernelGuid) {
 	  m_enableFlags = (EVENT_TRACE_FLAG_PROCESS | EVENT_TRACE_FLAG_NETWORK_TCPIP);
 	  m_traceLevel = 0;
 	  m_doFlush = true;

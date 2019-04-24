@@ -16,7 +16,7 @@
 
 #define DBG //if (0)
 
-DEFINE_GUID(MyGuid, 0xe671b575, 0xcd58, 0x4f74,
+DEFINE_GUID(MyUsbGuid, 0xe671b575, 0xcd58, 0x4f74,
 	0x87, 0x75, 0x47, 0x57, 0xc3, 0x8c, 0xe0, 0x51);
 
 DEFINE_GUID(/* 7426A56B-E2D5-4B30-BDEF-B31815C1A74A */
@@ -39,7 +39,7 @@ class USBHubTraceSessionImpl : public ETWTraceSessionBase {
   /*
    * constructor
    */
-	 USBHubTraceSessionImpl() : ETWTraceSessionBase("libetw.usbhub3", "Microsoft-Windows-USB-USBHUB3", USBHub3ProviderGuid, MyGuid) {
+	 USBHubTraceSessionImpl() : ETWTraceSessionBase("libetw.usbhub3", "Microsoft-Windows-USB-USBHUB3", USBHub3ProviderGuid, MyUsbGuid) {
 	 m_keywordMatchAny = USB_KEYWORD_PNP;
  }
 

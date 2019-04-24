@@ -52,6 +52,8 @@ public:
 	virtual void setFlags(uint32_t flags) = 0;
 
 	virtual uint32_t getFlags() = 0;
+
+	virtual std::string getErrors() = 0;
 };
 typedef std::shared_ptr<ETWTraceSession> SPETWTraceSession;
 
