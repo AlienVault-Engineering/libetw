@@ -61,7 +61,7 @@ typedef std::shared_ptr<ETWTraceSession> SPETWTraceSession;
 struct ETWProcessListener {
 	virtual void onProcessEnd(uint64_t uniqueId, uint32_t pid, uint32_t parentPid) = 0;
 	virtual void onProcessStart(uint64_t uniqueId, uint32_t pid, uint32_t parentPid,
-		std::string usersidstr, std::string filename, const std::string &commandLine) = 0;
+		void *pusersid, std::string filename, const std::string &commandLine) = 0;
 };
 typedef std::shared_ptr<ETWProcessListener> SPETWProcessListener;
 

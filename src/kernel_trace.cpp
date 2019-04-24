@@ -8,7 +8,6 @@
 #include <evntcons.h>
 #include <evntrace.h>
 #include <guiddef.h>
-#include <sddl.h> // ConvertSidToStringSid
 #include <wbemidl.h>
 #include <wmistr.h>
 
@@ -33,15 +32,6 @@ DEFINE_GUID(/* 9A280AC0-C8E0-11D1-84E2-00C04FB998A2 */
 	0x84, 0xe2, 0x00, 0xc0, 0x4f, 0xB9, 0x98, 0xA2);
 
 
-inline std::string SIDString(PSID psid) {
-  std::string retval;
-  LPTSTR cstr = nullptr;
-  if (nullptr != psid && ConvertSidToStringSid(psid, &cstr)) {
-    retval = cstr;
-    LocalFree(cstr);
-  }
-  return retval;
-}
 
 class KernelTraceSessionImpl;
 
@@ -108,10 +98,9 @@ void KernelTraceSessionImpl::onProcessEvent(PEVENT_RECORD pEvent) {
       if (!commandLineW.empty()) {
         commandLine = etw::wstringToString(commandLineW.c_str());
       }
-      std::string usersid = SIDString(psid);
       if (processListener_) {
         processListener_->onProcessStart(pProcess->getUniqueProcessKey(), pProcess->getProcessId(), 
-          pProcess->getParentId(), usersid, imageFileName, commandLine);
+          pProcess->getParentId(), psid, imageFileName, commandLine);
       }
     }
 

@@ -22,6 +22,8 @@ bool ExtractCmdlinePath(const std::string &cmdline, std::string &path) {
 
 	if (pos == std::string::npos) { return true; }
 
+	// some paths start with \??\
+
 	if (cmdline.length() > 5 && cmdline[0] == '\\' && cmdline[1] == '?') {
 		start = 4;
 	}

@@ -1,10 +1,21 @@
 #include <etw/etw_providers.h>
 #include <windows.h>
 #include <stdio.h>
+#include <sddl.h> // ConvertSidToStringSid
 
 #include <vector>
 
 #pragma comment(lib, "Ws2_32.lib")
+
+inline std::string SIDString(PSID psid) {
+	std::string retval;
+	LPTSTR cstr = nullptr;
+	if (nullptr != psid && ConvertSidToStringSid(psid, &cstr)) {
+		retval = cstr;
+		LocalFree(cstr);
+	}
+	return retval;
+}
 
 class MyKernelTraceListener : public ETWProcessListener, public ETWTcpListener {
 public:
@@ -12,7 +23,11 @@ public:
 		printf("ProcEND pid:%lu parentPid:%lu uuid:%llx\n", pid, parentPid, uniqueId);
 	}
 	void onProcessStart(uint64_t uniqueId, uint32_t pid, uint32_t parentPid,
-		std::string usersidstr, std::string filename, const std::string &commandLine) override {
+		void *pusersid, std::string filename, const std::string &commandLine) override {
+		std::string usersidstr;
+		if (pusersid != nullptr) {
+			usersidstr = SIDString(pusersid);
+		}
 		printf("ProcNEW pid:%lu parentPid:%lu uuid:%llx user:%s file:%s cmdline:%s\n",
 			pid, parentPid, uniqueId, usersidstr.c_str(),
 			filename.c_str(), commandLine.c_str());
@@ -80,13 +95,6 @@ struct MyUsbHubListener : public ETWUSBHubListener {
 };
 
 
-static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
-{
-	ETWTraceSession *pTraceSession = (ETWTraceSession*)lpParam;
-	pTraceSession->Run();
-	return 0;
-}
-
 void printErrs(std::string &errmsgs)
 {
 	if (errmsgs.empty()) {
@@ -94,6 +102,14 @@ void printErrs(std::string &errmsgs)
 	}
 	fputs(errmsgs.c_str(), stderr);
 	errmsgs.clear();
+}
+
+static DWORD WINAPI TraceThreadFunc(LPVOID lpParam)
+{
+	ETWTraceSession *pTraceSession = (ETWTraceSession*)lpParam;
+	pTraceSession->Run();
+	printErrs(pTraceSession->getErrors());
+	return 0;
 }
 
 struct TraceSessionThread {
