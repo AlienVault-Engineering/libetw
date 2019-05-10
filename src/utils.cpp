@@ -5,7 +5,7 @@
 
 namespace etw {
 
-bool ExtractCmdlinePath(const std::string &cmdline, std::string &path) {
+bool ExtractCmdlinePath(const std::string &cmdline, std::string &path, std::string filenameHint) {
 	if (cmdline.length() < 3) { return false; }
 
 	// quoted path
@@ -17,16 +17,29 @@ bool ExtractCmdlinePath(const std::string &cmdline, std::string &path) {
 		return false;
 	}
 
-	size_t start = 0;
-	auto pos = cmdline.find(' ');
-
-	if (pos == std::string::npos) { return true; }
-
 	// some paths start with \??\
 
+	size_t start = 0;
 	if (cmdline.length() > 5 && cmdline[0] == '\\' && cmdline[1] == '?') {
 		start = 4;
 	}
+
+
+	// should contain filenameHint
+
+	if (!filenameHint.empty()) {
+		auto pos = cmdline.find(filenameHint);
+		if (pos != std::string::npos) {
+			path = cmdline.substr(start, pos + filenameHint.size() - start);
+			return false;
+		}
+	}
+
+	// ideally paths with spaces are quoted, but not always
+
+	auto pos = cmdline.find(' ');
+
+	if (pos == std::string::npos) { return true; }
 
 	// not quoted, but could have spaces
 	auto last_pathsep_pos = cmdline.rfind('\\');
