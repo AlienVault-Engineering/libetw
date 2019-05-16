@@ -7,14 +7,24 @@
 #include <evntcons.h>
 #include <evntrace.h>
 #include <guiddef.h>
+#include <time.h>
 
 #include <etw/etw_providers.h>
 #include "utils.h"
 
+enum EtwSessionState {
+	MODE_UNKNOWN=0,
+	MODE_STARTING=1,
+	MODE_RUNNING=2,
+	MODE_CLOSED=3
+};
+
+#define ETW_DEFAULT_STARTUP_IGNORE_SECONDS 5
+
 class ETWTraceSessionBase : public ETWTraceSession
 {
 public:
-	ETWTraceSessionBase(const std::string sessionName, const std::string providerName, const GUID &providerGuid, const GUID &myguid) : 
+	ETWTraceSessionBase(const std::string sessionName, const std::string providerName, const GUID &providerGuid, const GUID &myguid) :
 		m_actualSessionName(sessionName), m_providerName(providerName), m_providerGuid(providerGuid), m_myguid(myguid), m_errMsgs() { }
 	~ETWTraceSessionBase() { }
 
@@ -33,6 +43,9 @@ public:
 		m_stopFlag = false;
 		m_errMsgs.clear();
 
+		m_state = MODE_STARTING;
+		m_tStart = time(NULL);
+
 		// Process Trace - blocks until BufferCallback returns FALSE, or
 
 		ULONG status = ProcessTrace(&m_startTraceHandle, 1, 0, 0);
@@ -41,13 +54,14 @@ public:
 			m_errMsgs += m_actualSessionName + ":ProcessTrace() failed with " + std::to_string(status) + "\n";
 			CloseTrace(m_startTraceHandle);
 		}
+		m_state = MODE_CLOSED;
 	}
 
 	ETWSessionInfo getSessionInfo() override {
 		ETWSessionInfo info;
 		info.sessionName = m_actualSessionName;
 		info.providerName = m_providerName;
-		info.providerGuid = etw::guidToString( m_providerGuid);
+		info.providerGuid = etw::guidToString(m_providerGuid);
 		return info;
 	}
 
@@ -110,10 +124,12 @@ public:
 
 	std::string m_errMsgs;
 
+	void setStartupIgnoreSeconds(int seconds) { m_startupIgnoreSeconds = seconds; }
+
 protected:
 	virtual void OnRecordEvent(PEVENT_RECORD pEvent) = 0;
 
-	bool m_stopFlag { false };
+	bool m_stopFlag{ false };
 	std::string m_actualSessionName;
 	std::string m_providerName;
 	const GUID &m_providerGuid;
@@ -122,6 +138,9 @@ protected:
 	PEVENT_TRACE_PROPERTIES m_pTraceProps{ 0 };
 	bool m_doFlush{ false };
 	uint32_t m_runtimeFlags{ 0 };
+	EtwSessionState m_state { MODE_UNKNOWN };
+	time_t m_startupIgnoreSeconds{ ETW_DEFAULT_STARTUP_IGNORE_SECONDS };
+	time_t m_tStart{ 0 }; // set in Run()
 
 	uint8_t m_traceLevel = TRACE_LEVEL_INFORMATION;
 	DWORD m_enableFlags{ 0 };
@@ -184,6 +203,23 @@ protected:
 	}
 
 	//---------------------------------------------------------------------
+	// Checks state to allow for ignoring flood of old events at startup.
+	//---------------------------------------------------------------------
+	virtual bool _isReady() {
+
+		if (m_state == MODE_RUNNING) { return true; }
+
+		if (m_state == MODE_STARTING) {
+			time_t now = time(NULL);
+			if ((now-m_tStart) >= m_startupIgnoreSeconds) {
+				m_state = MODE_RUNNING;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	//---------------------------------------------------------------------
 	// Function wrapper to call our class OnRecordEvent()
 	//---------------------------------------------------------------------
 	static VOID WINAPI StaticRecordEventCallback(PEVENT_RECORD pEvent) {
@@ -195,7 +231,9 @@ protected:
 		if (pTraceSession->getFlags() & ETWFlagDropAllEvents) {
 			return;
 		}
-		return pTraceSession->OnRecordEvent(pEvent);
+		if (pTraceSession->_isReady()) {
+			return pTraceSession->OnRecordEvent(pEvent);
+		}
 	}
 
 	//---------------------------------------------------------------------
